@@ -56,6 +56,10 @@ command = '''
   if [[ "$(uname -s)" == "Darwin" && "$(uname -m)" != "arm64" ]]; then
     echo "llamacpp-proxy not supported on Intel Mac" >&2; exit 1
   fi
+  _ollama="${OLLAMA_HOST:-127.0.0.1}:${OLLAMA_PORT:-11434}"
+  if ! curl -sf --connect-timeout 3 --max-time 5 "http://${_ollama}/" >/dev/null 2>&1; then
+    echo "ollama is not reachable at ${_ollama} — start ollama before this service" >&2; exit 1
+  fi
   model="$(cat "${FLOX_ENV_CACHE}/llamacpp-proxy-ollama.model" 2>/dev/null || true)"
   [[ -z "$model" ]] && model="default"
   exec llamacpp-proxy \
