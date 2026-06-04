@@ -81,10 +81,10 @@ _omlx_key_verify() {
 }
 
 # Resolves the omlx API key matching the running omlx instance via:
-#   1. macOS keychain (verified against running omlx)
-#   2. $FLOX_ENV_CACHE/omlx.api-key (verified; saves to keychain on success)
-#   3. ~/.cache/flox/remote/flox-labs/omlx/.flox/cache/omlx.api-key
-#      (canonical remote env location; saves to keychain + env cache on success)
+#   1. macOS keychain (fast path after first use)
+#   2. ~/.omlx/settings.json (omlx's own config — authoritative source)
+#   3. $FLOX_ENV_CACHE/omlx.api-key (env cache fallback)
+# On success via steps 2-3, saves to keychain for fast future lookups.
 # Outputs the key to stdout. Returns 1 if no valid key found.
 _omlx_key_get() {
   local host="$1" port="$2"
@@ -96,22 +96,21 @@ _omlx_key_get() {
     printf '%s' "$key"; return 0
   fi
 
-  # 2. Current env cache
-  if [[ -s "${FLOX_ENV_CACHE:-}/omlx.api-key" ]]; then
-    candidate="$(<"${FLOX_ENV_CACHE}/omlx.api-key")"
-    if _omlx_key_verify "$candidate" "$host" "$port"; then
+  # 2. omlx settings file (authoritative — always reflects the running instance)
+  local settings="$HOME/.omlx/settings.json"
+  if [[ -f "$settings" ]]; then
+    candidate="$(jq -r '.auth.api_key // empty' "$settings" 2>/dev/null || true)"
+    if [[ -n "$candidate" ]] && _omlx_key_verify "$candidate" "$host" "$port"; then
       _omlx_key_save_keychain "$candidate" || true
       printf '%s' "$candidate"; return 0
     fi
   fi
 
-  # 3. flox-labs/omlx remote env cache (canonical location)
-  local remote_key="$HOME/.cache/flox/remote/flox-labs/omlx/.flox/cache/omlx.api-key"
-  if [[ -s "$remote_key" ]]; then
-    candidate="$(<"$remote_key")"
+  # 3. Current env cache
+  if [[ -s "${FLOX_ENV_CACHE:-}/omlx.api-key" ]]; then
+    candidate="$(<"${FLOX_ENV_CACHE}/omlx.api-key")"
     if _omlx_key_verify "$candidate" "$host" "$port"; then
       _omlx_key_save_keychain "$candidate" || true
-      [[ -n "${FLOX_ENV_CACHE:-}" ]] && printf '%s' "$candidate" > "${FLOX_ENV_CACHE}/omlx.api-key"
       printf '%s' "$candidate"; return 0
     fi
   fi

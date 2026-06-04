@@ -74,21 +74,17 @@ command = '''
   if [[ "$(uname -s)" == "Darwin" && "$(uname -m)" != "arm64" ]]; then
     echo "llamacpp-proxy not supported on Intel Mac" >&2; exit 1
   fi
-  key_file="${FLOX_ENV_CACHE}/omlx.api-key"
-  for _ in $(seq 1 30); do [[ -s "$key_file" ]] && break; sleep 1; done
-  if [[ ! -s "$key_file" ]]; then
-    _kc="$(security find-generic-password -s "omlx-api-key" -a "default" -w 2>/dev/null || true)"
-    if [[ -z "$_kc" ]]; then
-      echo "Error: omlx API key not found — is omlx running?" >&2; exit 1
-    fi
-    printf '%s' "$_kc" > "$key_file"
+  # Read key from omlx's own settings file (authoritative source)
+  _api_key="$(jq -r '.auth.api_key // empty' "$HOME/.omlx/settings.json" 2>/dev/null || true)"
+  if [[ -z "$_api_key" ]]; then
+    echo "Error: omlx API key not found in ~/.omlx/settings.json — is omlx running?" >&2; exit 1
   fi
   model="$(cat "${FLOX_ENV_CACHE}/llamacpp-proxy-omlx.model" 2>/dev/null || true)"
   [[ -z "$model" ]] && model="default"
   exec llamacpp-proxy \
     --listen "${LLAMACPP_PROXY_OMLX_LISTEN:-127.0.0.1:8083}" \
     --backend "${OMLX_HOST:-127.0.0.1}:${OMLX_PORT:-8000}" \
-    --backend-api-key "$(cat "$key_file")" \
+    --backend-api-key "$_api_key" \
     --backend-model "$model" \
     --gemini-listen "${LLAMACPP_PROXY_GEMINI_OMLX_LISTEN:-127.0.0.1:8084}"
 '''
