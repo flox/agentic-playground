@@ -19,7 +19,6 @@ hermes-agent.pkg-path = "flox/hermes-agent"
 hermes-agent.pkg-group = "hermes-agent"
 llamacpp-proxy.pkg-path = "flox-labs/llamacpp-proxy"
 llamacpp-proxy.pkg-group = "llamacpp-proxy"
-llamacpp-proxy.systems = ["aarch64-darwin", "aarch64-linux", "x86_64-linux"]
 bash.pkg-path = "bash"
 jq.pkg-path = "jq"
 gnused.pkg-path = "gnused"
