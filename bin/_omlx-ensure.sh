@@ -124,6 +124,23 @@ omlx_ensure_model() {
   local model="$1" host="$2" port="$3"
   local base="http://${host}:${port}"
 
+  # Wait for omlx to be reachable (up to 30s). HTTP 401 counts as ready —
+  # it means omlx is up and auth-gated. Only connection refused means not yet.
+  local n=0 code
+  while true; do
+    n=$((n + 1))
+    if [[ $n -gt 30 ]]; then
+      echo "Error: omlx at ${host}:${port} did not become ready in time" >&2
+      echo "  Is omlx running? Try: flox services status" >&2
+      return 1
+    fi
+    code="$(curl -s -o /dev/null -w '%{http_code}' \
+      --connect-timeout 1 --max-time 2 \
+      "http://${host}:${port}/v1/models" 2>/dev/null || true)"
+    [[ "$code" == "200" || "$code" == "401" ]] && break
+    sleep 1
+  done
+
   OMLX_API_KEY="$(_omlx_key_get "$host" "$port")" || return 1
 
   local models
