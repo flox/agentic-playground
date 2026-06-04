@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Wrapper for crush to use omlx via the Anthropic Messages API.
+# omlx natively serves /v1/messages, so no proxy is needed.
+# Config is isolated to $FLOX_ENV_CACHE/crush-omlx to avoid touching
+# ~/.config/crush or the ollama variant's config.
+#
+# Usage: launch-crush-omlx --model <hf-model-id> [crush args...]
+#   e.g. launch-crush-omlx --model mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit
+
+MODEL=""
+CRUSH_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model)
+      MODEL="${2:?--model requires a value}"
+      shift 2
+      ;;
+    *)
+      CRUSH_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$MODEL" ]]; then
+  echo "Usage: omlx launch crush --model <hf-model-id> [crush args...]" >&2
+  exit 1
+fi
+
+OMLX_HOST="${OMLX_HOST:-127.0.0.1}"
+OMLX_PORT="${OMLX_PORT:-8000}"
+
+source "${BASH_SOURCE[0]%/*}/_omlx-ensure.sh"
+omlx_ensure_model "$MODEL" "$OMLX_HOST" "$OMLX_PORT" || exit 1
+
+CRUSH_DATA_DIR="${FLOX_ENV_CACHE}/crush-omlx"
+mkdir -p "$CRUSH_DATA_DIR"
+
+# Escape model name for JSON
+MODEL_JSON="${MODEL//\\/\\\\}"
+MODEL_JSON="${MODEL_JSON//\"/\\\"}"
+
+cat > "$CRUSH_DATA_DIR/crush.json" <<EOF
+{
+  "providers": {
+    "omlx": {
+      "type": "anthropic",
+      "base_url": "http://${OMLX_HOST}:${OMLX_PORT}",
+      "api_key": "${OMLX_API_KEY}",
+      "models": [
+        {
+          "id": "${MODEL_JSON}",
+          "name": "${MODEL_JSON}",
+          "cost_per_1m_in": 0,
+          "cost_per_1m_out": 0,
+          "cost_per_1m_in_cached": 0,
+          "cost_per_1m_out_cached": 0,
+          "context_window": 32768,
+          "default_max_tokens": 8192,
+          "can_reason": false,
+          "supports_attachments": false
+        }
+      ]
+    }
+  },
+  "models": {
+    "large": {
+      "model": "${MODEL_JSON}",
+      "provider": "omlx",
+      "max_tokens": 8192
+    },
+    "small": {
+      "model": "${MODEL_JSON}",
+      "provider": "omlx",
+      "max_tokens": 4096
+    }
+  }
+}
+EOF
+
+exec crush -D "$CRUSH_DATA_DIR" ${CRUSH_ARGS[@]+"${CRUSH_ARGS[@]}"}
