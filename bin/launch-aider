@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Wrapper for aider to use ollama.
+# aider has native ollama support via the ollama_chat/ model prefix.
+#
+# Usage: launch-aider --model <model> [aider args...]
+#   e.g. launch-aider --model qwen2.5
+#        launch-aider --model qwen2.5 --auto-commits
+
+MODEL=""
+AIDER_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model)
+      MODEL="${2:?--model requires a value}"
+      shift 2
+      ;;
+    *)
+      AIDER_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$MODEL" ]]; then
+  echo "Usage: launch-aider --model <model> [aider args...]" >&2
+  exit 1
+fi
+
+OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1}"
+OLLAMA_PORT="${OLLAMA_PORT:-11434}"
+
+source "${BASH_SOURCE[0]%/*}/_ollama-ensure.sh"
+ollama_ensure_model "$MODEL" "$OLLAMA_HOST" "$OLLAMA_PORT" || exit 1
+
+export OLLAMA_API_BASE="http://${OLLAMA_HOST}:${OLLAMA_PORT}"
+
+exec aider \
+  --model "ollama_chat/${MODEL}" \
+  ${AIDER_ARGS[@]+"${AIDER_ARGS[@]}"}

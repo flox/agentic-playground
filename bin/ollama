@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${BASH_SOURCE[0]%/*}"
+
+# Find the real ollama binary, skipping this wrapper.
+_real_ollama() {
+  local self_dir
+  self_dir="$(cd "$SCRIPT_DIR" && pwd)"
+  IFS=: read -ra _path_dirs <<< "$PATH"
+  for dir in "${_path_dirs[@]}"; do
+    if [[ -x "$dir/ollama" ]] && [[ "$(cd "$dir" && pwd)" != "$self_dir" ]]; then
+      echo "$dir/ollama"
+      return 0
+    fi
+  done
+  echo "Error: cannot find ollama binary" >&2
+  return 1
+}
+
+# Pass through if not "ollama launch ..."
+if [[ "${1:-}" != "launch" ]]; then
+  exec "$(_real_ollama)" "$@"
+fi
+
+TOOL="${2:-}"
+
+# Dispatch unsupported tools to our wrappers
+case "$TOOL" in
+  gemini)   shift 2; exec "$SCRIPT_DIR/launch-gemini" "$@" ;;
+  crush)    shift 2; exec "$SCRIPT_DIR/launch-crush" "$@" ;;
+  deepseek) shift 2; exec "$SCRIPT_DIR/launch-deepseek" "$@" ;;
+  aider)    shift 2; exec "$SCRIPT_DIR/launch-aider" "$@" ;;
+  *)        exec "$(_real_ollama)" "$@" ;;
+esac

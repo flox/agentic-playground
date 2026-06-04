@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Wrapper for crush to use ollama via llamacpp-proxy.
+# crush speaks openai-compat, so we need llamacpp-proxy to translate
+# OpenAI Chat Completions <-> ollama. Config is isolated to $FLOX_ENV_CACHE
+# to avoid overwriting the user's ~/.config/crush.
+#
+# Usage: launch-crush --model <model> [crush args...]
+#   e.g. launch-crush --model qwen2.5
+#        launch-crush --model qwen2.5 --yolo
+
+MODEL=""
+CRUSH_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model)
+      MODEL="${2:?--model requires a value}"
+      shift 2
+      ;;
+    *)
+      CRUSH_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$MODEL" ]]; then
+  echo "Usage: launch-crush --model <model> [crush args...]" >&2
+  exit 1
+fi
+
+OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1}"
+OLLAMA_PORT="${OLLAMA_PORT:-11434}"
+
+source "${BASH_SOURCE[0]%/*}/_ollama-ensure.sh"
+ollama_ensure_model "$MODEL" "$OLLAMA_HOST" "$OLLAMA_PORT" || exit 1
+
+PROXY_LISTEN="${LLAMACPP_PROXY_LISTEN:-127.0.0.1:8083}"
+
+cleanup() {
+  if [[ -n "${PROXY_PID:-}" ]]; then
+    kill "$PROXY_PID" 2>/dev/null || true
+    wait "$PROXY_PID" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT INT TERM HUP
+
+PROXY_LOG="${FLOX_ENV_CACHE:-/tmp}/llamacpp-proxy-crush.log"
+llamacpp-proxy \
+  --listen "$PROXY_LISTEN" \
+  --backend "$OLLAMA_HOST:$OLLAMA_PORT" \
+  --backend-model "$MODEL" 2>>"$PROXY_LOG" &
+PROXY_PID=$!
+
+PROXY_READY=false
+for _ in $(seq 1 30); do
+  if ! kill -0 "$PROXY_PID" 2>/dev/null; then
+    echo "Error: llamacpp-proxy failed to start (port ${PROXY_LISTEN} may be in use; see ${PROXY_LOG})" >&2
+    exit 1
+  fi
+  if curl -sf --connect-timeout 1 --max-time 2 "http://${PROXY_LISTEN}/health" >/dev/null 2>&1; then
+    PROXY_READY=true
+    break
+  fi
+  sleep 0.1
+done
+if [[ "$PROXY_READY" != true ]]; then
+  echo "Error: llamacpp-proxy did not become ready in time (see ${PROXY_LOG})" >&2
+  exit 1
+fi
+
+# Isolate crush config to $FLOX_ENV_CACHE via --data-dir and crush.json
+# so we don't touch the user's ~/.config/crush
+CRUSH_DATA_DIR="${FLOX_ENV_CACHE}/crush"
+mkdir -p "$CRUSH_DATA_DIR"
+
+MODEL_JSON="${MODEL//\\/\\\\}"
+MODEL_JSON="${MODEL_JSON//\"/\\\"}"
+
+cat > "$CRUSH_DATA_DIR/crush.json" <<EOF
+{
+  "providers": {
+    "llamacpp": {
+      "type": "openai-compat",
+      "base_url": "http://${PROXY_LISTEN}/v1",
+      "api_key": "llamacpp-local",
+      "models": [
+        {
+          "id": "${MODEL_JSON}",
+          "name": "${MODEL_JSON}",
+          "context_window": 65536
+        }
+      ]
+    }
+  },
+  "models": {
+    "large": {
+      "model": "${MODEL_JSON}",
+      "provider": "llamacpp",
+      "max_tokens": 8192
+    },
+    "small": {
+      "model": "${MODEL_JSON}",
+      "provider": "llamacpp",
+      "max_tokens": 4096
+    }
+  }
+}
+EOF
+
+crush -D "$CRUSH_DATA_DIR" ${CRUSH_ARGS[@]+"${CRUSH_ARGS[@]}"}

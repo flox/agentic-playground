@@ -1,0 +1,58 @@
+schema-version = "1.12.0"
+
+
+[install]
+codex.pkg-path = "flox/codex"
+codex.pkg-group = "codex"
+crush.pkg-path = "flox/crush"
+crush.pkg-group = "crush"
+gemini-cli.pkg-path = "flox/gemini-cli"
+gemini-cli.pkg-group = "gemini-cli"
+claude-code.pkg-path = "flox/claude-code"
+claude-code.pkg-group = "claude-code"
+opencode.pkg-path = "flox/opencode"
+opencode.pkg-group = "opencode"
+deepseek-tui.pkg-path = "flox/deepseek-tui"
+deepseek-tui.pkg-group = "deepseek-tui"
+aider-chat.pkg-path = "aider-chat"
+hermes-agent.pkg-path = "flox/hermes-agent"
+hermes-agent.pkg-group = "hermes-agent"
+llamacpp-proxy.pkg-path = "flox-labs/llamacpp-proxy"
+llamacpp-proxy.pkg-group = "llamacpp-proxy"
+llamacpp-proxy.systems = ["aarch64-darwin", "aarch64-linux", "x86_64-linux"]
+
+
+[vars]
+
+
+[hook]
+on-activate = '''
+  export OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1}"
+  export OLLAMA_PORT="${OLLAMA_PORT:-11434}"
+  export OPENAI_API_BASE="${OPENAI_API_BASE:-http://127.0.0.1:11434/v1}"
+  export OPENAI_API_KEY="${OPENAI_API_KEY:-ollama}"
+'''
+
+
+[profile]
+common = '''
+  export PATH="$FLOX_ENV_PROJECT/bin:$PATH"
+'''
+
+
+[services]
+
+
+[include]
+
+
+[options]
+# Systems that environment is compatible with
+# systems = [
+#   "aarch64-darwin",
+#   "aarch64-linux",
+#   "x86_64-darwin",
+#   "x86_64-linux",
+# ]
+# Uncomment to disable CUDA detection.
+# cuda-detection = false
