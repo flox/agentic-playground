@@ -16,10 +16,11 @@ proxy_ensure_model() {
 
   if [[ "$current" != "$model" ]] || [[ "$healthy" != "true" ]]; then
     printf '%s' "$model" > "$model_file"
-    flox services restart "$service" || {
+    if ! flox services restart "$service"; then
+      printf '%s' "$current" > "$model_file"
       echo "Error: could not restart service $service" >&2
       return 1
-    }
+    fi
     local ready=false
     for _ in $(seq 1 50); do
       if curl -sf --connect-timeout 1 --max-time 2 \
@@ -29,6 +30,7 @@ proxy_ensure_model() {
       sleep 0.1
     done
     if [[ "$ready" != "true" ]]; then
+      printf '%s' "$current" > "$model_file"
       echo "Error: $service did not become ready in time" >&2
       return 1
     fi
