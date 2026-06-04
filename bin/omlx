@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="${BASH_SOURCE[0]%/*}"
+
+# Find the real omlx binary, skipping this wrapper.
+_real_omlx() {
+  local self_dir
+  self_dir="$(cd "$SCRIPT_DIR" && pwd)"
+  IFS=: read -ra _path_dirs <<< "$PATH"
+  for dir in "${_path_dirs[@]}"; do
+    if [[ -x "$dir/omlx" ]] && [[ "$(cd "$dir" && pwd)" != "$self_dir" ]]; then
+      echo "$dir/omlx"
+      return 0
+    fi
+  done
+  echo "Error: cannot find omlx binary" >&2
+  return 1
+}
+
+# Pass through if not "omlx launch ..."
+if [[ "${1:-}" != "launch" ]]; then
+  exec "$(_real_omlx)" "$@"
+fi
+
+TOOL="${2:-}"
+
+# Dispatch tools not natively supported by omlx launch to our wrappers.
+# codex, opencode, and openclaw are handled natively by omlx launch.
+case "$TOOL" in
+  gemini)               shift 2; exec "$SCRIPT_DIR/launch-gemini-omlx" "$@" ;;
+  deepseek)             shift 2; exec "$SCRIPT_DIR/launch-deepseek-omlx" "$@" ;;
+  aider)                shift 2; exec "$SCRIPT_DIR/launch-aider-omlx" "$@" ;;
+  claude|claude-code)   shift 2; exec "$SCRIPT_DIR/launch-claude-omlx" "$@" ;;
+  hermes|hermes-agent)  shift 2; exec "$SCRIPT_DIR/launch-hermes-omlx" "$@" ;;
+  crush)                shift 2; exec "$(_real_omlx)" launch openclaw "$@" ;;
+  *)                    exec "$(_real_omlx)" "$@" ;;
+esac

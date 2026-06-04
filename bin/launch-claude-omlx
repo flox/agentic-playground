@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Wrapper for claude-code to use omlx.
+# omlx natively serves the Anthropic Messages API (/v1/messages), so no proxy needed.
+#
+# Usage: launch-claude-omlx --model <hf-model-id> [claude args...]
+#   e.g. launch-claude-omlx --model mlx-community/Qwen3.5-9B-MLX-4bit
+
+MODEL=""
+CLAUDE_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model)
+      MODEL="${2:?--model requires a value}"
+      shift 2
+      ;;
+    *)
+      CLAUDE_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$MODEL" ]]; then
+  echo "Usage: omlx launch claude --model <hf-model-id> [claude args...]" >&2
+  exit 1
+fi
+
+OMLX_HOST="${OMLX_HOST:-127.0.0.1}"
+OMLX_PORT="${OMLX_PORT:-8000}"
+
+source "${BASH_SOURCE[0]%/*}/_omlx-ensure.sh"
+omlx_ensure_model "$MODEL" "$OMLX_HOST" "$OMLX_PORT" || exit 1
+
+export ANTHROPIC_BASE_URL="http://${OMLX_HOST}:${OMLX_PORT}"
+export ANTHROPIC_API_KEY="$OMLX_API_KEY"
+
+exec claude --model "$MODEL" ${CLAUDE_ARGS[@]+"${CLAUDE_ARGS[@]}"}

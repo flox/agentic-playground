@@ -20,6 +20,11 @@ hermes-agent.pkg-group = "hermes-agent"
 llamacpp-proxy.pkg-path = "flox-labs/llamacpp-proxy"
 llamacpp-proxy.pkg-group = "llamacpp-proxy"
 llamacpp-proxy.systems = ["aarch64-darwin", "aarch64-linux", "x86_64-linux"]
+bash.pkg-path = "bash"
+jq.pkg-path = "jq"
+gnused.pkg-path = "gnused"
+gawk.pkg-path = "gawk"
+git.pkg-path = "git"
 
 
 [vars]
@@ -31,6 +36,8 @@ on-activate = '''
   export OLLAMA_PORT="${OLLAMA_PORT:-11434}"
   export OPENAI_API_BASE="${OPENAI_API_BASE:-http://127.0.0.1:11434/v1}"
   export OPENAI_API_KEY="${OPENAI_API_KEY:-ollama}"
+  export OMLX_HOST="${OMLX_HOST:-127.0.0.1}"
+  export OMLX_PORT="${OMLX_PORT:-8000}"
 '''
 
 
