@@ -83,8 +83,8 @@ _omlx_key_verify() {
 # Resolves the omlx API key matching the running omlx instance via:
 #   1. macOS keychain (verified against running omlx)
 #   2. $FLOX_ENV_CACHE/omlx.api-key (verified; saves to keychain on success)
-#   3. find under $HOME/dev and $HOME/.local/share/flox (verified; saves to
-#      keychain and $FLOX_ENV_CACHE on success for fast future lookups)
+#   3. ~/.cache/flox/remote/flox-labs/omlx/.flox/cache/omlx.api-key
+#      (canonical remote env location; saves to keychain + env cache on success)
 # Outputs the key to stdout. Returns 1 if no valid key found.
 _omlx_key_get() {
   local host="$1" port="$2"
