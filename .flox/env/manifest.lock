@@ -25,6 +25,10 @@
         "pkg-path": "flox/deepseek-tui",
         "pkg-group": "deepseek-tui"
       },
+      "flox-mcp-server": {
+        "pkg-path": "flox/flox-mcp-server",
+        "pkg-group": "flox-mcp-server"
+      },
       "gawk": {
         "pkg-path": "gawk"
       },
@@ -66,7 +70,7 @@
       }
     },
     "hook": {
-      "on-activate": "# Publish the service's bind address (OMLX_HOST / OMLX_PORT) and admin key\n# (OMLX_API_KEY) so consumers and interactive shells can reach it.\n# Override any value at runtime by writing to:\n#   $FLOX_ENV_CACHE/omlx.host       e.g. \"0.0.0.0\"\n#   $FLOX_ENV_CACHE/omlx.port       e.g. \"9001\"\n#   $FLOX_ENV_CACHE/omlx.api-key    enables admin endpoints when set\nexport OMLX_HOST=\"$(cat \"$FLOX_ENV_CACHE/omlx.host\" 2>/dev/null || echo 127.0.0.1)\"\nexport OMLX_PORT=\"$(cat \"$FLOX_ENV_CACHE/omlx.port\" 2>/dev/null || echo 8000)\"\nexport OMLX_API_KEY=\"$(cat \"$FLOX_ENV_CACHE/omlx.api-key\" 2>/dev/null || true)\"\n\n  export OLLAMA_HOST=\"${OLLAMA_HOST:-127.0.0.1}\"\n  export OLLAMA_PORT=\"${OLLAMA_PORT:-11434}\"\n  export OPENAI_API_BASE=\"${OPENAI_API_BASE:-http://127.0.0.1:11434/v1}\"\n  export OPENAI_API_KEY=\"${OPENAI_API_KEY:-ollama}\"\n  export OMLX_HOST=\"${OMLX_HOST:-127.0.0.1}\"\n  export OMLX_PORT=\"${OMLX_PORT:-8000}\"\n"
+      "on-activate": "# Publish the service's bind address (OMLX_HOST / OMLX_PORT) and admin key\n# (OMLX_API_KEY) so consumers and interactive shells can reach it.\n# Override any value at runtime by writing to:\n#   $FLOX_ENV_CACHE/omlx.host       e.g. \"0.0.0.0\"\n#   $FLOX_ENV_CACHE/omlx.port       e.g. \"9001\"\n#   $FLOX_ENV_CACHE/omlx.api-key    enables admin endpoints when set\nexport OMLX_HOST=\"$(cat \"$FLOX_ENV_CACHE/omlx.host\" 2>/dev/null || echo 127.0.0.1)\"\nexport OMLX_PORT=\"$(cat \"$FLOX_ENV_CACHE/omlx.port\" 2>/dev/null || echo 8000)\"\nexport OMLX_API_KEY=\"$(cat \"$FLOX_ENV_CACHE/omlx.api-key\" 2>/dev/null || true)\"\n\n  export OLLAMA_HOST=\"${OLLAMA_HOST:-127.0.0.1}\"\n  export OLLAMA_PORT=\"${OLLAMA_PORT:-11434}\"\n  export OPENAI_API_BASE=\"${OPENAI_API_BASE:-http://127.0.0.1:11434/v1}\"\n  export OPENAI_API_KEY=\"${OPENAI_API_KEY:-ollama}\"\n  export OMLX_HOST=\"${OMLX_HOST:-127.0.0.1}\"\n  export OMLX_PORT=\"${OMLX_PORT:-8000}\"\n  export LLAMACPP_PROXY_OLLAMA_LISTEN=\"${LLAMACPP_PROXY_OLLAMA_LISTEN:-127.0.0.1:8081}\"\n  export LLAMACPP_PROXY_GEMINI_OLLAMA_LISTEN=\"${LLAMACPP_PROXY_GEMINI_OLLAMA_LISTEN:-127.0.0.1:8082}\"\n  export LLAMACPP_PROXY_OMLX_LISTEN=\"${LLAMACPP_PROXY_OMLX_LISTEN:-127.0.0.1:8083}\"\n  export LLAMACPP_PROXY_GEMINI_OMLX_LISTEN=\"${LLAMACPP_PROXY_GEMINI_OMLX_LISTEN:-127.0.0.1:8084}\"\n"
     },
     "profile": {
       "common": "  export PATH=\"$FLOX_ENV_PROJECT/bin:$PATH\"\n"
@@ -77,6 +81,12 @@
       ]
     },
     "services": {
+      "llamacpp-proxy-ollama": {
+        "command": "  if [[ \"$(uname -s)\" == \"Darwin\" && \"$(uname -m)\" != \"arm64\" ]]; then\n    echo \"llamacpp-proxy not supported on Intel Mac\" >&2; exit 1\n  fi\n  _ollama=\"${OLLAMA_HOST:-127.0.0.1}:${OLLAMA_PORT:-11434}\"\n  if ! curl -sf --connect-timeout 3 --max-time 5 \"http://${_ollama}/\" >/dev/null 2>&1; then\n    echo \"ollama is not reachable at ${_ollama} — start ollama before this service\" >&2; exit 1\n  fi\n  model=\"$(cat \"${FLOX_ENV_CACHE}/llamacpp-proxy-ollama.model\" 2>/dev/null || true)\"\n  [[ -z \"$model\" ]] && model=\"default\"\n  exec llamacpp-proxy \\\n    --listen \"${LLAMACPP_PROXY_OLLAMA_LISTEN:-127.0.0.1:8081}\" \\\n    --backend \"${OLLAMA_HOST:-127.0.0.1}:${OLLAMA_PORT:-11434}\" \\\n    --backend-model \"$model\" \\\n    --gemini-listen \"${LLAMACPP_PROXY_GEMINI_OLLAMA_LISTEN:-127.0.0.1:8082}\"\n"
+      },
+      "llamacpp-proxy-omlx": {
+        "command": "  if [[ \"$(uname -s)\" == \"Darwin\" && \"$(uname -m)\" != \"arm64\" ]]; then\n    echo \"llamacpp-proxy not supported on Intel Mac\" >&2; exit 1\n  fi\n  # Read key from omlx's own settings file (authoritative source)\n  _api_key=\"$(jq -r '.auth.api_key // empty' \"$HOME/.omlx/settings.json\" 2>/dev/null || true)\"\n  if [[ -z \"$_api_key\" ]]; then\n    echo \"Error: omlx API key not found in ~/.omlx/settings.json — is omlx running?\" >&2; exit 1\n  fi\n  model=\"$(cat \"${FLOX_ENV_CACHE}/llamacpp-proxy-omlx.model\" 2>/dev/null || true)\"\n  [[ -z \"$model\" ]] && model=\"default\"\n  exec llamacpp-proxy \\\n    --listen \"${LLAMACPP_PROXY_OMLX_LISTEN:-127.0.0.1:8083}\" \\\n    --backend \"${OMLX_HOST:-127.0.0.1}:${OMLX_PORT:-8000}\" \\\n    --backend-api-key \"$_api_key\" \\\n    --backend-model \"$model\" \\\n    --gemini-listen \"${LLAMACPP_PROXY_GEMINI_OMLX_LISTEN:-127.0.0.1:8084}\"\n"
+      },
       "omlx": {
         "command": "host=\"$(cat \"$FLOX_ENV_CACHE/omlx.host\" 2>/dev/null || echo 127.0.0.1)\"\nport=\"$(cat \"$FLOX_ENV_CACHE/omlx.port\" 2>/dev/null || echo 8000)\"\nkey=\"$(cat \"$FLOX_ENV_CACHE/omlx.api-key\" 2>/dev/null || true)\"\nif [ -n \"$key\" ]; then\n  exec omlx serve --host \"$host\" --port \"$port\" --api-key \"$key\"\nelse\n  exec omlx serve --host \"$host\" --port \"$port\"\nfi\n"
       }
@@ -293,6 +303,36 @@
       "system": "aarch64-darwin",
       "group": "llamacpp-proxy",
       "priority": 5
+    },
+    {
+      "attr_path": "omlx",
+      "broken": false,
+      "derivation": "/nix/store/sw09nia2nbwa7ja8z6jkw6mfndkbjhg4-omlx-env.drv",
+      "description": "LLM inference server, optimized for your Mac",
+      "install_id": "omlx",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/floxenvs?rev=1eaf3f2ae806528d7cdb4f54ee0d933b1b51e57d",
+      "name": "omlx-env",
+      "pname": "omlx",
+      "rev": "1eaf3f2ae806528d7cdb4f54ee0d933b1b51e57d",
+      "rev_count": 6005,
+      "rev_date": "2026-06-03T20:56:18Z",
+      "scrape_date": "2026-06-04T19:48:56.865695Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.4.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/wl79vs3bi126fxnawpc1lwvzyrl7xwjv-omlx-env"
+      },
+      "system": "aarch64-darwin",
+      "group": "omlx",
+      "priority": 6
     },
     {
       "attr_path": "opencode",
@@ -564,34 +604,35 @@
       "priority": 5
     },
     {
-      "attr_path": "omlx",
+      "attr_path": "flox-mcp-server",
       "broken": false,
-      "derivation": "/nix/store/sw09nia2nbwa7ja8z6jkw6mfndkbjhg4-omlx-env.drv",
-      "description": "LLM inference server, optimized for your Mac",
-      "install_id": "omlx",
-      "license": "Apache-2.0",
-      "locked_url": "https://github.com/flox/floxenvs?rev=1eaf3f2ae806528d7cdb4f54ee0d933b1b51e57d",
-      "name": "omlx-env",
-      "pname": "omlx",
-      "rev": "1eaf3f2ae806528d7cdb4f54ee0d933b1b51e57d",
-      "rev_count": 6005,
-      "rev_date": "2026-06-03T20:56:18Z",
-      "scrape_date": "2026-06-04T19:48:56.865695Z",
+      "derivation": "/nix/store/xqxwlh8kh7jl51n2b04bqb5xgcwl2g42-flox-mcp-server-0.2.2.drv",
+      "description": "MCP server for Flox package manager",
+      "install_id": "flox-mcp-server",
+      "license": "MIT",
+      "locked_url": "ssh://git@github.com/flox/mcp-server.git?rev=e727f1b0f40c70b0335091e1a876e582abcccb5a",
+      "name": "flox-mcp-server-0.2.2",
+      "pname": "flox-mcp-server",
+      "rev": "e727f1b0f40c70b0335091e1a876e582abcccb5a",
+      "rev_count": 32,
+      "rev_date": "2026-04-20T17:03:53Z",
+      "scrape_date": "2026-06-05T14:32:01.899270Z",
       "stabilities": [
         "staging",
         "unstable"
       ],
       "unfree": false,
-      "version": "0.4.1",
+      "version": "0.2.2",
       "outputs_to_install": [
         "out"
       ],
       "outputs": {
-        "out": "/nix/store/wl79vs3bi126fxnawpc1lwvzyrl7xwjv-omlx-env"
+        "dist": "/nix/store/6y5c1wg3z3xaf7s8ffbjb0a0l8xqypm8-flox-mcp-server-0.2.2-dist",
+        "out": "/nix/store/pq350aj4njgjmgylg67ya4dsfg7q4a2j-flox-mcp-server-0.2.2"
       },
       "system": "aarch64-darwin",
-      "group": "omlx",
-      "priority": 6
+      "group": "flox-mcp-server",
+      "priority": 5
     }
   ],
   "compose": {
@@ -619,6 +660,10 @@
         "deepseek-tui": {
           "pkg-path": "flox/deepseek-tui",
           "pkg-group": "deepseek-tui"
+        },
+        "flox-mcp-server": {
+          "pkg-path": "flox/flox-mcp-server",
+          "pkg-group": "flox-mcp-server"
         },
         "gawk": {
           "pkg-path": "gawk"
@@ -653,12 +698,20 @@
         }
       },
       "hook": {
-        "on-activate": "  export OLLAMA_HOST=\"${OLLAMA_HOST:-127.0.0.1}\"\n  export OLLAMA_PORT=\"${OLLAMA_PORT:-11434}\"\n  export OPENAI_API_BASE=\"${OPENAI_API_BASE:-http://127.0.0.1:11434/v1}\"\n  export OPENAI_API_KEY=\"${OPENAI_API_KEY:-ollama}\"\n  export OMLX_HOST=\"${OMLX_HOST:-127.0.0.1}\"\n  export OMLX_PORT=\"${OMLX_PORT:-8000}\"\n"
+        "on-activate": "  export OLLAMA_HOST=\"${OLLAMA_HOST:-127.0.0.1}\"\n  export OLLAMA_PORT=\"${OLLAMA_PORT:-11434}\"\n  export OPENAI_API_BASE=\"${OPENAI_API_BASE:-http://127.0.0.1:11434/v1}\"\n  export OPENAI_API_KEY=\"${OPENAI_API_KEY:-ollama}\"\n  export OMLX_HOST=\"${OMLX_HOST:-127.0.0.1}\"\n  export OMLX_PORT=\"${OMLX_PORT:-8000}\"\n  export LLAMACPP_PROXY_OLLAMA_LISTEN=\"${LLAMACPP_PROXY_OLLAMA_LISTEN:-127.0.0.1:8081}\"\n  export LLAMACPP_PROXY_GEMINI_OLLAMA_LISTEN=\"${LLAMACPP_PROXY_GEMINI_OLLAMA_LISTEN:-127.0.0.1:8082}\"\n  export LLAMACPP_PROXY_OMLX_LISTEN=\"${LLAMACPP_PROXY_OMLX_LISTEN:-127.0.0.1:8083}\"\n  export LLAMACPP_PROXY_GEMINI_OMLX_LISTEN=\"${LLAMACPP_PROXY_GEMINI_OMLX_LISTEN:-127.0.0.1:8084}\"\n"
       },
       "profile": {
         "common": "  export PATH=\"$FLOX_ENV_PROJECT/bin:$PATH\"\n"
       },
       "options": {},
+      "services": {
+        "llamacpp-proxy-ollama": {
+          "command": "  if [[ \"$(uname -s)\" == \"Darwin\" && \"$(uname -m)\" != \"arm64\" ]]; then\n    echo \"llamacpp-proxy not supported on Intel Mac\" >&2; exit 1\n  fi\n  _ollama=\"${OLLAMA_HOST:-127.0.0.1}:${OLLAMA_PORT:-11434}\"\n  if ! curl -sf --connect-timeout 3 --max-time 5 \"http://${_ollama}/\" >/dev/null 2>&1; then\n    echo \"ollama is not reachable at ${_ollama} — start ollama before this service\" >&2; exit 1\n  fi\n  model=\"$(cat \"${FLOX_ENV_CACHE}/llamacpp-proxy-ollama.model\" 2>/dev/null || true)\"\n  [[ -z \"$model\" ]] && model=\"default\"\n  exec llamacpp-proxy \\\n    --listen \"${LLAMACPP_PROXY_OLLAMA_LISTEN:-127.0.0.1:8081}\" \\\n    --backend \"${OLLAMA_HOST:-127.0.0.1}:${OLLAMA_PORT:-11434}\" \\\n    --backend-model \"$model\" \\\n    --gemini-listen \"${LLAMACPP_PROXY_GEMINI_OLLAMA_LISTEN:-127.0.0.1:8082}\"\n"
+        },
+        "llamacpp-proxy-omlx": {
+          "command": "  if [[ \"$(uname -s)\" == \"Darwin\" && \"$(uname -m)\" != \"arm64\" ]]; then\n    echo \"llamacpp-proxy not supported on Intel Mac\" >&2; exit 1\n  fi\n  # Read key from omlx's own settings file (authoritative source)\n  _api_key=\"$(jq -r '.auth.api_key // empty' \"$HOME/.omlx/settings.json\" 2>/dev/null || true)\"\n  if [[ -z \"$_api_key\" ]]; then\n    echo \"Error: omlx API key not found in ~/.omlx/settings.json — is omlx running?\" >&2; exit 1\n  fi\n  model=\"$(cat \"${FLOX_ENV_CACHE}/llamacpp-proxy-omlx.model\" 2>/dev/null || true)\"\n  [[ -z \"$model\" ]] && model=\"default\"\n  exec llamacpp-proxy \\\n    --listen \"${LLAMACPP_PROXY_OMLX_LISTEN:-127.0.0.1:8083}\" \\\n    --backend \"${OMLX_HOST:-127.0.0.1}:${OMLX_PORT:-8000}\" \\\n    --backend-api-key \"$_api_key\" \\\n    --backend-model \"$model\" \\\n    --gemini-listen \"${LLAMACPP_PROXY_GEMINI_OMLX_LISTEN:-127.0.0.1:8084}\"\n"
+        }
+      },
       "include": {
         "environments": [
           {
