@@ -26,7 +26,7 @@ fi
 TOOL="${2:-}"
 
 # Dispatch known tools to our wrappers; everything else passes through to
-# the real omlx binary (including openclaw, pi, etc. handled natively).
+# the real omlx binary (including pi, etc. handled natively).
 case "$TOOL" in
   gemini)               shift 2; exec "$SCRIPT_DIR/launch-gemini-omlx" "$@" ;;
   deepseek)             shift 2; exec "$SCRIPT_DIR/launch-deepseek-omlx" "$@" ;;
@@ -36,5 +36,7 @@ case "$TOOL" in
   crush)                shift 2; exec "$SCRIPT_DIR/launch-crush-omlx" "$@" ;;
   opencode)             shift 2; exec "$SCRIPT_DIR/launch-opencode-omlx" "$@" ;;
   codex)                shift 2; exec "$SCRIPT_DIR/launch-codex-omlx" "$@" ;;
+  openclaw)             shift 2; exec "$SCRIPT_DIR/launch-openclaw-omlx" "$@" ;;
+  nanocoder)            shift 2; exec "$SCRIPT_DIR/launch-nanocoder-omlx" "$@" ;;
   *)                    exec "$(_real_omlx)" "$@" ;;
 esac

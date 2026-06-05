@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Wrapper for openclaw to use omlx via the OpenAI completions API.
+# omlx natively serves /v1/chat/completions, so no proxy is needed.
+# Config is injected into the 'omlx' openclaw profile (~/.openclaw-omlx/)
+# via 'openclaw config patch' to avoid touching the user's default profile.
+#
+# Usage: launch-openclaw-omlx --model <hf-model-id> [openclaw args...]
+#   e.g. launch-openclaw-omlx --model mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit
+
+MODEL=""
+OPENCLAW_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model)
+      MODEL="${2:?--model requires a value}"
+      shift 2
+      ;;
+    *)
+      OPENCLAW_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$MODEL" ]]; then
+  echo "Usage: omlx launch openclaw --model <hf-model-id> [openclaw args...]" >&2
+  exit 1
+fi
+
+OMLX_HOST="${OMLX_HOST:-127.0.0.1}"
+OMLX_PORT="${OMLX_PORT:-8000}"
+
+source "${BASH_SOURCE[0]%/*}/_omlx-ensure.sh"
+omlx_ensure_model "$MODEL" "$OMLX_HOST" "$OMLX_PORT" || exit 1
+
+# Escape values for JSON interpolation
+KEY_JSON="${OMLX_API_KEY//\\/\\\\}"
+KEY_JSON="${KEY_JSON//\"/\\\"}"
+# omlx strips the org prefix in /v1/models listings; use the short name
+# so agents.defaults.model resolves correctly against the provider catalog.
+SHORT_MODEL="${MODEL##*/}"
+SHORT_JSON="${SHORT_MODEL//\\/\\\\}"
+SHORT_JSON="${SHORT_JSON//\"/\\\"}"
+
+# Inject provider + default model into the isolated 'omlx' profile.
+# config patch merges recursively: settings already in ~/.openclaw-omlx/
+# are preserved; only models.providers.omlx and agents.defaults.model are
+# updated. mode=replace tells openclaw to use only explicitly configured
+# providers (avoids falling back to cloud providers).
+openclaw --profile omlx config patch --stdin <<EOF
+{
+  "models": {
+    "mode": "replace",
+    "providers": {
+      "omlx": {
+        "api": "openai-completions",
+        "baseUrl": "http://${OMLX_HOST}:${OMLX_PORT}/v1",
+        "auth": "api-key",
+        "apiKey": "${KEY_JSON}",
+        "models": [
+          {
+            "id": "${SHORT_JSON}",
+            "name": "${SHORT_JSON}"
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": "omlx/${SHORT_JSON}"
+    }
+  }
+}
+EOF
+
+exec openclaw --profile omlx chat ${OPENCLAW_ARGS[@]+"${OPENCLAW_ARGS[@]}"}

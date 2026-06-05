@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Wrapper for nanocoder to use ollama via the OpenAI-compatible API.
+# Provider config is injected via NANOCODER_PROVIDERS (highest priority over
+# project and global configs). Config is isolated to $FLOX_ENV_CACHE/nanocoder
+# via NANOCODER_CONFIG_DIR to avoid touching the user's global nanocoder config.
+#
+# Usage: ollama launch nanocoder --model <model> [nanocoder args...]
+#   e.g. ollama launch nanocoder --model qwen2.5-coder:latest
+
+MODEL=""
+NANOCODER_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model)
+      MODEL="${2:?--model requires a value}"
+      shift 2
+      ;;
+    *)
+      NANOCODER_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$MODEL" ]]; then
+  echo "Usage: ollama launch nanocoder --model <model> [nanocoder args...]" >&2
+  exit 1
+fi
+
+OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1}"
+OLLAMA_PORT="${OLLAMA_PORT:-11434}"
+
+source "${BASH_SOURCE[0]%/*}/_ollama-ensure.sh"
+ollama_ensure_model "$MODEL" "$OLLAMA_HOST" "$OLLAMA_PORT" || exit 1
+
+NANOCODER_CONFIG_DIR="${FLOX_ENV_CACHE}/nanocoder"
+mkdir -p "$NANOCODER_CONFIG_DIR"
+
+# Build provider config JSON via jq — handles all escaping automatically.
+# NANOCODER_PROVIDERS takes highest priority over project and global configs.
+NANOCODER_PROVIDERS="$(jq -cn \
+  --arg baseUrl "http://${OLLAMA_HOST}:${OLLAMA_PORT}/v1" \
+  --arg apiKey  "ollama" \
+  --arg model   "$MODEL" \
+  '[{"name":"ollama","baseUrl":$baseUrl,"apiKey":$apiKey,"models":[$model],"sdkProvider":"openai-compatible"}]')"
+
+export NANOCODER_CONFIG_DIR NANOCODER_PROVIDERS
+
+exec nanocoder --provider ollama --model "$MODEL" ${NANOCODER_ARGS[@]+"${NANOCODER_ARGS[@]}"}

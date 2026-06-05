@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Wrapper for nanocoder to use omlx via the OpenAI-compatible API.
+# Provider config is injected via NANOCODER_PROVIDERS (highest priority over
+# project and global configs). Config is isolated to $FLOX_ENV_CACHE/nanocoder-omlx
+# via NANOCODER_CONFIG_DIR to avoid touching the user's global nanocoder config.
+#
+# Usage: launch-nanocoder-omlx --model <hf-model-id> [nanocoder args...]
+#   e.g. launch-nanocoder-omlx --model mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit
+
+MODEL=""
+NANOCODER_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model)
+      MODEL="${2:?--model requires a value}"
+      shift 2
+      ;;
+    *)
+      NANOCODER_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$MODEL" ]]; then
+  echo "Usage: omlx launch nanocoder --model <hf-model-id> [nanocoder args...]" >&2
+  exit 1
+fi
+
+OMLX_HOST="${OMLX_HOST:-127.0.0.1}"
+OMLX_PORT="${OMLX_PORT:-8000}"
+
+source "${BASH_SOURCE[0]%/*}/_omlx-ensure.sh"
+omlx_ensure_model "$MODEL" "$OMLX_HOST" "$OMLX_PORT" || exit 1
+
+# omlx strips the org prefix in /v1/models listings
+SHORT_MODEL="${MODEL##*/}"
+
+NANOCODER_CONFIG_DIR="${FLOX_ENV_CACHE}/nanocoder-omlx"
+mkdir -p "$NANOCODER_CONFIG_DIR"
+
+# Build provider config JSON via jq — handles all escaping automatically.
+# NANOCODER_PROVIDERS takes highest priority over project and global configs.
+NANOCODER_PROVIDERS="$(jq -cn \
+  --arg baseUrl "http://${OMLX_HOST}:${OMLX_PORT}/v1" \
+  --arg apiKey  "$OMLX_API_KEY" \
+  --arg model   "$SHORT_MODEL" \
+  '[{"name":"omlx","baseUrl":$baseUrl,"apiKey":$apiKey,"models":[$model],"sdkProvider":"openai-compatible"}]')"
+
+export NANOCODER_CONFIG_DIR NANOCODER_PROVIDERS
+
+exec nanocoder --provider omlx --model "$SHORT_MODEL" ${NANOCODER_ARGS[@]+"${NANOCODER_ARGS[@]}"}

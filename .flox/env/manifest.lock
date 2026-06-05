@@ -56,6 +56,10 @@
         "pkg-path": "flox-labs/llamacpp-proxy",
         "pkg-group": "llamacpp-proxy"
       },
+      "nanocoder": {
+        "pkg-path": "flox/nanocoder",
+        "pkg-group": "nanocoder"
+      },
       "omlx": {
         "pkg-path": "flox/omlx",
         "pkg-group": "omlx",
@@ -370,6 +374,36 @@
       "priority": 6
     },
     {
+      "attr_path": "openclaw",
+      "broken": false,
+      "derivation": "/nix/store/9wyga3bkdbfqv4wqvh2szff0ryn5s23y-openclaw-2026.6.1.drv",
+      "description": "Self-hosted, open-source AI assistant/agent",
+      "install_id": "openclaw",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/floxenvs?rev=fad67d4f1c9fdc34f46d7d2b00a3e29d16c449e7",
+      "name": "openclaw-2026.6.1",
+      "pname": "openclaw",
+      "rev": "fad67d4f1c9fdc34f46d7d2b00a3e29d16c449e7",
+      "rev_count": 6097,
+      "rev_date": "2026-06-04T02:26:21Z",
+      "scrape_date": "2026-06-05T14:38:00.697187Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2026.6.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/gxwg26d37mls5jy0477i3kmnpmkphp6g-openclaw-2026.6.1"
+      },
+      "system": "aarch64-darwin",
+      "group": "openclaw",
+      "priority": 5
+    },
+    {
       "attr_path": "opencode",
       "broken": false,
       "derivation": "/nix/store/0gnwn5hq6ziikc1h4i5ydvk4q0bpw8f6-opencode-1.15.13.drv",
@@ -639,33 +673,34 @@
       "priority": 5
     },
     {
-      "attr_path": "openclaw",
+      "attr_path": "nanocoder",
       "broken": false,
-      "derivation": "/nix/store/9wyga3bkdbfqv4wqvh2szff0ryn5s23y-openclaw-2026.6.1.drv",
-      "description": "Self-hosted, open-source AI assistant/agent",
-      "install_id": "openclaw",
+      "derivation": "/nix/store/hv6vgxldwm7qlkw902p25z7xsdgqaq9l-nanocoder-1.24.1.drv",
+      "description": "A beautiful local-first coding agent running in your terminal - built by the community for the community",
+      "install_id": "nanocoder",
       "license": "MIT",
-      "locked_url": "https://github.com/flox/floxenvs?rev=fad67d4f1c9fdc34f46d7d2b00a3e29d16c449e7",
-      "name": "openclaw-2026.6.1",
-      "pname": "openclaw",
-      "rev": "fad67d4f1c9fdc34f46d7d2b00a3e29d16c449e7",
-      "rev_count": 6097,
-      "rev_date": "2026-06-04T02:26:21Z",
-      "scrape_date": "2026-06-05T14:38:00.697187Z",
+      "locked_url": "git@github.com:barstoolbluz/nix-ai-tools.git?rev=a3a28eb462220f5b452c3ad5911fa1b0850ac7cd",
+      "name": "nanocoder-1.24.1",
+      "pname": "nanocoder",
+      "rev": "a3a28eb462220f5b452c3ad5911fa1b0850ac7cd",
+      "rev_count": 81,
+      "rev_date": "2026-04-07T10:45:38Z",
+      "scrape_date": "2026-06-05T20:06:22.535933Z",
       "stabilities": [
+        "stable",
         "staging",
         "unstable"
       ],
       "unfree": false,
-      "version": "2026.6.1",
+      "version": "1.24.1",
       "outputs_to_install": [
         "out"
       ],
       "outputs": {
-        "out": "/nix/store/gxwg26d37mls5jy0477i3kmnpmkphp6g-openclaw-2026.6.1"
+        "out": "/nix/store/iksfd9818kv78ln1mmdyng4ivrbw0pzn-nanocoder-1.24.1"
       },
       "system": "aarch64-darwin",
-      "group": "openclaw",
+      "group": "nanocoder",
       "priority": 5
     }
   ],
@@ -725,6 +760,10 @@
         "llamacpp-proxy": {
           "pkg-path": "flox-labs/llamacpp-proxy",
           "pkg-group": "llamacpp-proxy"
+        },
+        "nanocoder": {
+          "pkg-path": "flox/nanocoder",
+          "pkg-group": "nanocoder"
         },
         "openclaw": {
           "pkg-path": "flox/openclaw",

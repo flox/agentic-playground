@@ -31,5 +31,6 @@ case "$TOOL" in
   crush)    shift 2; exec "$SCRIPT_DIR/launch-crush" "$@" ;;
   deepseek) shift 2; exec "$SCRIPT_DIR/launch-deepseek" "$@" ;;
   aider)    shift 2; exec "$SCRIPT_DIR/launch-aider" "$@" ;;
+  nanocoder) shift 2; exec "$SCRIPT_DIR/launch-nanocoder" "$@" ;;
   *)        exec "$(_real_ollama)" "$@" ;;
 esac
