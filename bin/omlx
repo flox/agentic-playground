@@ -25,8 +25,8 @@ fi
 
 TOOL="${2:-}"
 
-# Dispatch tools not natively supported by omlx launch to our wrappers.
-# codex, opencode, and openclaw are handled natively by omlx launch.
+# Dispatch known tools to our wrappers; everything else passes through to
+# the real omlx binary (including openclaw, pi, etc. handled natively).
 case "$TOOL" in
   gemini)               shift 2; exec "$SCRIPT_DIR/launch-gemini-omlx" "$@" ;;
   deepseek)             shift 2; exec "$SCRIPT_DIR/launch-deepseek-omlx" "$@" ;;
