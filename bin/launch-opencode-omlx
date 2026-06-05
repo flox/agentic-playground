@@ -39,34 +39,35 @@ omlx_ensure_model "$MODEL" "$OMLX_HOST" "$OMLX_PORT" || exit 1
 OPENCODE_DATA_DIR="${FLOX_ENV_CACHE}/opencode"
 mkdir -p "$OPENCODE_DATA_DIR"
 
-MODEL_JSON="${MODEL//\\/\\\\}"
-MODEL_JSON="${MODEL_JSON//\"/\\\"}"
+# Build the omlx provider block and target model as jq args so they can be
+# merged into an existing config, preserving user-added settings (MCP servers,
+# keybinds, etc.). On first run the config is created from scratch.
+_provider="$(jq -n \
+  --arg base "http://${OMLX_HOST}:${OMLX_PORT}/v1" \
+  --arg key  "$OMLX_API_KEY" \
+  --arg id   "$MODEL" \
+  '{
+    "npm":  "@ai-sdk/openai-compatible",
+    "name": "oMLX",
+    "options": { "baseURL": $base, "apiKey": $key },
+    "models": { ($id): { "name": $id, "modalities": { "input": ["text"], "output": ["text"] } } }
+  }')"
 
-cat > "$OPENCODE_DATA_DIR/opencode.json" <<EOF
-{
-  "\$schema": "https://opencode.ai/config.json",
-  "provider": {
-    "omlx": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "oMLX",
-      "options": {
-        "baseURL": "http://${OMLX_HOST}:${OMLX_PORT}/v1",
-        "apiKey": "${OMLX_API_KEY}"
-      },
-      "models": {
-        "${MODEL_JSON}": {
-          "name": "${MODEL_JSON}",
-          "modalities": {
-            "input": ["text"],
-            "output": ["text"]
-          }
-        }
-      }
-    }
-  },
-  "model": "omlx/${MODEL_JSON}"
-}
-EOF
+_config="$OPENCODE_DATA_DIR/opencode.json"
+if [[ -f "$_config" ]]; then
+  jq --argjson p "$_provider" \
+     --arg     m "omlx/$MODEL" \
+     '.["$schema"] = "https://opencode.ai/config.json"
+      | .provider.omlx = $p
+      | .model = $m' \
+     "$_config" > "${_config}.tmp" && mv "${_config}.tmp" "$_config"
+else
+  jq -n \
+    --argjson p "$_provider" \
+    --arg     m "omlx/$MODEL" \
+    '{ "$schema": "https://opencode.ai/config.json", provider: { omlx: $p }, model: $m }' \
+    > "$_config"
+fi
 
 export XDG_CONFIG_HOME="${FLOX_ENV_CACHE}"
 exec opencode ${OPENCODE_ARGS[@]+"${OPENCODE_ARGS[@]}"}
