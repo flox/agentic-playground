@@ -35,5 +35,6 @@ case "$TOOL" in
   hermes|hermes-agent)  shift 2; exec "$SCRIPT_DIR/launch-hermes-omlx" "$@" ;;
   crush)                shift 2; exec "$SCRIPT_DIR/launch-crush-omlx" "$@" ;;
   opencode)             shift 2; exec "$SCRIPT_DIR/launch-opencode-omlx" "$@" ;;
+  codex)                shift 2; exec "$SCRIPT_DIR/launch-codex-omlx" "$@" ;;
   *)                    exec "$(_real_omlx)" "$@" ;;
 esac
