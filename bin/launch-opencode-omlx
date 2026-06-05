@@ -54,19 +54,31 @@ _provider="$(jq -n \
   }')"
 
 _config="$OPENCODE_DATA_DIR/opencode.json"
-if [[ -f "$_config" ]]; then
-  jq --argjson p "$_provider" \
-     --arg     m "omlx/$MODEL" \
-     '.["$schema"] = "https://opencode.ai/config.json"
-      | .provider.omlx = $p
-      | .model = $m' \
-     "$_config" > "${_config}.tmp" && mv "${_config}.tmp" "$_config"
-else
+trap 'rm -f "${_config}.tmp"' EXIT
+
+_write_fresh() {
   jq -n \
     --argjson p "$_provider" \
     --arg     m "omlx/$MODEL" \
     '{ "$schema": "https://opencode.ai/config.json", provider: { omlx: $p }, model: $m }' \
     > "$_config"
+}
+
+if [[ -f "$_config" ]]; then
+  if jq --argjson p "$_provider" \
+        --arg     m "omlx/$MODEL" \
+        '.["$schema"] = "https://opencode.ai/config.json"
+         | .provider.omlx = $p
+         | .model = $m' \
+        "$_config" > "${_config}.tmp" 2>/dev/null; then
+    mv "${_config}.tmp" "$_config"
+  else
+    # Existing config is malformed — recreate from scratch
+    rm -f "${_config}.tmp"
+    _write_fresh
+  fi
+else
+  _write_fresh
 fi
 
 export XDG_CONFIG_HOME="${FLOX_ENV_CACHE}"
