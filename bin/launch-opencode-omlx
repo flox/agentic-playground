@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Wrapper for opencode to use omlx.
+# omlx serves the OpenAI-compat endpoint; opencode connects via
+# @ai-sdk/openai-compatible. Config is written to $FLOX_ENV_CACHE/opencode
+# via XDG_CONFIG_HOME so ~/.config/opencode is never touched.
+#
+# Usage: launch-opencode-omlx --model <hf-model-id> [opencode args...]
+#   e.g. launch-opencode-omlx --model mlx-community/Qwen2.5-Coder-1.5B-Instruct-4bit
+
+MODEL=""
+OPENCODE_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model)
+      MODEL="${2:?--model requires a value}"
+      shift 2
+      ;;
+    *)
+      OPENCODE_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$MODEL" ]]; then
+  echo "Usage: omlx launch opencode --model <hf-model-id> [opencode args...]" >&2
+  exit 1
+fi
+
+OMLX_HOST="${OMLX_HOST:-127.0.0.1}"
+OMLX_PORT="${OMLX_PORT:-8000}"
+
+source "${BASH_SOURCE[0]%/*}/_omlx-ensure.sh"
+omlx_ensure_model "$MODEL" "$OMLX_HOST" "$OMLX_PORT" || exit 1
+
+OPENCODE_DATA_DIR="${FLOX_ENV_CACHE}/opencode"
+mkdir -p "$OPENCODE_DATA_DIR"
+
+MODEL_JSON="${MODEL//\\/\\\\}"
+MODEL_JSON="${MODEL_JSON//\"/\\\"}"
+
+cat > "$OPENCODE_DATA_DIR/opencode.json" <<EOF
+{
+  "\$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "omlx": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "oMLX",
+      "options": {
+        "baseURL": "http://${OMLX_HOST}:${OMLX_PORT}/v1",
+        "apiKey": "${OMLX_API_KEY}"
+      },
+      "models": {
+        "${MODEL_JSON}": {
+          "name": "${MODEL_JSON}",
+          "modalities": {
+            "input": ["text"],
+            "output": ["text"]
+          }
+        }
+      }
+    }
+  },
+  "model": "omlx/${MODEL_JSON}"
+}
+EOF
+
+export XDG_CONFIG_HOME="${FLOX_ENV_CACHE}"
+exec opencode ${OPENCODE_ARGS[@]+"${OPENCODE_ARGS[@]}"}

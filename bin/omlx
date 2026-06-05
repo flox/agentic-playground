@@ -34,5 +34,6 @@ case "$TOOL" in
   claude|claude-code)   shift 2; exec "$SCRIPT_DIR/launch-claude-omlx" "$@" ;;
   hermes|hermes-agent)  shift 2; exec "$SCRIPT_DIR/launch-hermes-omlx" "$@" ;;
   crush)                shift 2; exec "$SCRIPT_DIR/launch-crush-omlx" "$@" ;;
+  opencode)             shift 2; exec "$SCRIPT_DIR/launch-opencode-omlx" "$@" ;;
   *)                    exec "$(_real_omlx)" "$@" ;;
 esac
